@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../providers/favorites_provider.dart';
-import '../widgets/destination_grid_card.dart';
-import '../widgets/gradient_background.dart';
+import '../theme/app_theme.dart';
+import '../widgets/destination_card.dart';
 import 'detail_screen.dart';
 
 class FavoritesScreen extends StatelessWidget {
@@ -12,95 +11,92 @@ class FavoritesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context);
+    final favorites = context.watch<FavoritesProvider>();
+    final list = favorites.favorites;
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 900 ? 3 : (width > 600 ? 2 : 1);
 
     return Scaffold(
-      body: GradientBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-                child: Row(
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Favorites ❤️',
-                          style: GoogleFonts.poppins(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '${favoritesProvider.favorites.length} saved destinations',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
+      appBar: AppBar(
+        title: const Text('Favorites'),
+        actions: [
+          if (list.isNotEmpty)
+            IconButton(
+              icon: const Icon(Icons.delete_outline,
+                  color: AppColors.goldPrimary),
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: AppColors.darkCard,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      side: BorderSide(
+                        color: AppColors.goldPrimary.withOpacity(0.4),
+                      ),
                     ),
-                  ],
-                ),
-              ).animate().fadeIn(),
-              Expanded(
-                child: favoritesProvider.favorites.isEmpty
-                    ? _buildEmpty()
-                    : _buildGrid(favoritesProvider),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGrid(FavoritesProvider favoritesProvider) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final crossAxisCount = width < 600
-            ? 2
-            : width < 900
-            ? 3
-            : 4;
-
-        return GridView.builder(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 0.78,
-          ),
-          itemCount: favoritesProvider.favorites.length,
-          itemBuilder: (context, index) {
-            final destination = favoritesProvider.favorites[index];
-            return DestinationGridCard(
-              destination: destination,
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        DetailScreen(destination: destination),
+                    title: Text(
+                      'Clear all favorites?',
+                      style: GoogleFonts.playfairDisplay(
+                        color: AppColors.goldPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    content: Text(
+                      'This action cannot be undone.',
+                      style: GoogleFonts.poppins(
+                          color: AppColors.textMuted, fontSize: 13),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: Text('Cancel',
+                            style: GoogleFonts.poppins(
+                                color: AppColors.silverMid)),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          favorites.clearAll();
+                          Navigator.pop(context);
+                        },
+                        child: Text('Clear',
+                            style: GoogleFonts.poppins(
+                                color: AppColors.goldPrimary,
+                                fontWeight: FontWeight.w600)),
+                      ),
+                    ],
                   ),
                 );
               },
-            )
-                .animate()
-                .fadeIn(delay: (index * 30).ms, duration: 400.ms)
-                .scale(
-              begin: const Offset(0.9, 0.9),
-              end: const Offset(1, 1),
-            );
-          },
-        );
-      },
+            ),
+        ],
+      ),
+      body: list.isEmpty
+          ? _buildEmpty()
+          : GridView.builder(
+        padding: const EdgeInsets.all(20),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
+          crossAxisSpacing: 16,
+          mainAxisSpacing: 16,
+          childAspectRatio: 0.85,
+        ),
+        itemCount: list.length,
+        itemBuilder: (_, i) {
+          final dest = list[i];
+          return DestinationCard(
+            destination: dest,
+            isFavorite: true,
+            onFavoriteToggle: () => favorites.toggleFavorite(dest),
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DetailScreen(destination: dest),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 
@@ -110,35 +106,32 @@ class FavoritesScreen extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Container(
-            padding: const EdgeInsets.all(32),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
               shape: BoxShape.circle,
+              border:
+              Border.all(color: AppColors.goldPrimary.withOpacity(0.4)),
             ),
-            child: const Icon(
-              Icons.favorite_border,
-              size: 64,
-              color: Color(0xFFFF6B6B),
-            ),
-          ).animate().scale(duration: 500.ms),
-          const SizedBox(height: 24),
+            child: const Icon(Icons.favorite_border,
+                size: 56, color: AppColors.goldPrimary),
+          ),
+          const SizedBox(height: 20),
           Text(
             'No favorites yet',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+            style: GoogleFonts.playfairDisplay(
+              color: AppColors.textLight,
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
             ),
-          ).animate().fadeIn(delay: 200.ms),
+          ),
           const SizedBox(height: 8),
           Text(
-            'Start exploring and save your dream destinations',
-            style: GoogleFonts.inter(
-              fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.6),
+            'Tap the heart icon to save destinations',
+            style: GoogleFonts.poppins(
+              color: AppColors.textMuted,
+              fontSize: 13,
             ),
-            textAlign: TextAlign.center,
-          ).animate().fadeIn(delay: 400.ms),
+          ),
         ],
       ),
     );

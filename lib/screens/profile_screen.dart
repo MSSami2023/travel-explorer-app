@@ -1,171 +1,168 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../providers/theme_provider.dart';
-import '../providers/auth_provider.dart';
-import '../widgets/gradient_background.dart';
-import 'login_screen.dart';
+import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
+import '../providers/booking_provider.dart';
+import '../providers/favorites_provider.dart';
+import '../theme/app_theme.dart';
+import '../widgets/animated_background.dart';
+import '../widgets/glass_card.dart';
+import 'favorites_screen.dart';
+import '../utils/page_transitions.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
-    final authProvider = Provider.of<AuthProvider>(context);
-    final user = authProvider.user;
-
-    final name = user?['name'] ?? 'Guest';
-    final email = user?['email'] ?? 'guest@example.com';
-    final initials = name
-        .toString()
-        .split(' ')
-        .take(2)
-        .map((e) => e.isNotEmpty ? e[0].toUpperCase() : '')
-        .join();
+    final fav = context.watch<FavoritesProvider>();
+    final bookings = context.watch<BookingProvider>();
 
     return Scaffold(
-      body: GradientBackground(
+      backgroundColor: Colors.transparent,
+      body: AnimatedBackground(
         child: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            physics: const BouncingScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 100),
             children: [
-              Text(
-                'Profile',
-                style: GoogleFonts.poppins(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ).animate().fadeIn(),
-
-              const SizedBox(height: 24),
-
-              // User card
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFFFF6B6B).withValues(alpha: 0.4),
-                      blurRadius: 25,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
-                ),
-                child: Row(
+              Center(
+                child: Column(
                   children: [
-                    CircleAvatar(
-                      radius: 32,
-                      backgroundColor: Colors.white.withValues(alpha: 0.25),
-                      child: Text(
-                        initials.isEmpty ? 'U' : initials,
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: AppTheme.goldGradient,
+                        boxShadow: [AppTheme.goldGlow],
+                      ),
+                      child: CircleAvatar(
+                        radius: 48,
+                        backgroundColor: AppColors.darkCard,
+                        child: Text('T',
+                            style: GoogleFonts.playfairDisplay(
+                                fontSize: 40,
+                                color: AppColors.goldPrimary,
+                                fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text('Traveler',
+                        style: GoogleFonts.playfairDisplay(
+                            color: AppColors.textLight,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 4),
+                    Text('traveler@explorer.com',
                         style: GoogleFonts.poppins(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            name.toString(),
-                            style: GoogleFonts.poppins(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            email.toString(),
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              color: Colors.white.withValues(alpha: 0.9),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    ),
+                            color: AppColors.textMuted, fontSize: 13)),
                   ],
-                ),
-              ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
-
-              const SizedBox(height: 24),
-
-              _tile(
-                context,
-                Icons.dark_mode,
-                'Dark Mode',
-                trailing: Switch(
-                  value: themeProvider.themeMode == ThemeMode.dark,
-                  onChanged: (_) => themeProvider.toggleTheme(),
-                  activeColor: const Color(0xFFFF6B6B),
                 ),
               ),
-              _tile(context, Icons.notifications_outlined, 'Notifications', onTap: () {}),
-              _tile(context, Icons.language, 'Language', onTap: () {}),
-              _tile(context, Icons.info_outline, 'About', onTap: () {}),
-              _tile(context, Icons.star_outline, 'Rate Us', onTap: () {}),
-              _tile(context, Icons.share_outlined, 'Share App', onTap: () {}),
-              _tile(context, Icons.privacy_tip_outlined, 'Privacy Policy', onTap: () {}),
-
-              const SizedBox(height: 16),
-
-              // Logout button
-              GestureDetector(
-                onTap: () => _showLogoutDialog(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF6B6B).withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: const Color(0xFFFF6B6B).withValues(alpha: 0.4),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+              const SizedBox(height: 30),
+              // Stats
+              Row(
+                children: [
+                  _stat(Icons.favorite, '${fav.count}', 'Favorites',
+                          () => Navigator.push(context,
+                          ScaleFadeRoute(page: const FavoritesScreen()))),
+                  const SizedBox(width: 12),
+                  _stat(Icons.card_travel, '${bookings.count}', 'Bookings',
+                          () {}),
+                  const SizedBox(width: 12),
+                  _stat(Icons.attach_money,
+                      '\$${bookings.totalSpent.toInt()}', 'Spent', () {}),
+                ],
+              ),
+              const SizedBox(height: 30),
+              Text('My Bookings',
+                  style: GoogleFonts.playfairDisplay(
+                      color: AppColors.textLight,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              if (bookings.bookings.isEmpty)
+                GlassCard(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
                     children: [
-                      const Icon(Icons.logout, color: Color(0xFFFF6B6B)),
-                      const SizedBox(width: 12),
-                      Text(
-                        'Logout',
-                        style: GoogleFonts.inter(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: const Color(0xFFFF6B6B),
-                        ),
-                      ),
+                      const Icon(Icons.card_travel,
+                          size: 40, color: AppColors.silverDark),
+                      const SizedBox(height: 10),
+                      Text('No bookings yet',
+                          style: GoogleFonts.poppins(
+                              color: AppColors.textMuted, fontSize: 13)),
                     ],
                   ),
-                ),
-              ).animate().fadeIn(delay: 400.ms),
-
-              const SizedBox(height: 24),
-
-              Center(
-                child: Text(
-                  'Travel Explorer v1.0.0',
-                  style: GoogleFonts.inter(
-                    fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.4),
+                )
+              else
+                ...bookings.bookings.reversed.map((b) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GlassCard(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(b.destination.imageUrl,
+                              width: 60,
+                              height: 60,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Container(
+                                  width: 60,
+                                  height: 60,
+                                  color: AppColors.darkSurface)),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment:
+                            CrossAxisAlignment.start,
+                            children: [
+                              Text(b.destination.name,
+                                  style: GoogleFonts.playfairDisplay(
+                                      color: AppColors.textLight,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700)),
+                              const SizedBox(height: 2),
+                              Text(
+                                  '${DateFormat('dd MMM yyyy').format(b.date)} • ${b.guests} guests',
+                                  style: GoogleFonts.poppins(
+                                      color: AppColors.textMuted,
+                                      fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.goldGradient,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(b.status,
+                              style: GoogleFonts.poppins(
+                                  color: Colors.black,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
+                )),
+              const SizedBox(height: 30),
+              Text('Settings',
+                  style: GoogleFonts.playfairDisplay(
+                      color: AppColors.textLight,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
+              _settingTile(Icons.notifications_outlined, 'Notifications',
+                      () {}),
+              _settingTile(Icons.language, 'Language', () {}),
+              _settingTile(Icons.shield_outlined, 'Privacy', () {}),
+              _settingTile(Icons.help_outline, 'Help & Support', () {}),
+              _settingTile(Icons.info_outline, 'About', () {}),
             ],
           ),
         ),
@@ -173,87 +170,53 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _tile(
-      BuildContext context,
-      IconData icon,
-      String title, {
-        Widget? trailing,
-        VoidCallback? onTap,
-      }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: ListTile(
-        leading: Icon(icon, color: const Color(0xFFFF6B6B)),
-        title: Text(
-          title,
-          style: GoogleFonts.inter(color: Colors.white),
-        ),
-        trailing: trailing ??
-            const Icon(
-              Icons.arrow_forward_ios,
-              size: 16,
-              color: Colors.white54,
-            ),
+  Widget _stat(IconData i, String v, String l, VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
         onTap: onTap,
+        child: GlassCard(
+          padding: const EdgeInsets.symmetric(vertical: 16),
+          child: Column(
+            children: [
+              Icon(i, color: AppColors.goldPrimary, size: 22),
+              const SizedBox(height: 6),
+              Text(v,
+                  style: GoogleFonts.playfairDisplay(
+                      color: AppColors.textLight,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w800)),
+              Text(l,
+                  style: GoogleFonts.poppins(
+                      color: AppColors.textMuted, fontSize: 10)),
+            ],
+          ),
+        ),
       ),
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: const Color(0xFF1A1F38),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-        ),
-        title: Text(
-          'Logout?',
-          style: GoogleFonts.poppins(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        content: Text(
-          'Are you sure you want to logout?',
-          style: GoogleFonts.inter(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.inter(color: Colors.white70),
+  Widget _settingTile(IconData i, String t, VoidCallback onTap) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: AppColors.darkElevated,
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: Icon(i, color: AppColors.goldPrimary, size: 18),
           ),
-          TextButton(
-            onPressed: () async {
-              final authProvider =
-              Provider.of<AuthProvider>(context, listen: false);
-              Navigator.pop(dialogContext);
-              await authProvider.logout();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                );
-              }
-            },
-            child: Text(
-              'Logout',
-              style: GoogleFonts.inter(
-                color: const Color(0xFFFF6B6B),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-        ],
+          title: Text(t,
+              style: GoogleFonts.poppins(
+                  color: AppColors.textLight, fontSize: 14)),
+          trailing: const Icon(Icons.chevron_right,
+              color: AppColors.textMuted, size: 20),
+          onTap: onTap,
+        ),
       ),
     );
   }

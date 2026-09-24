@@ -1,234 +1,457 @@
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../models/destination.dart';
 import '../providers/favorites_provider.dart';
+import '../theme/app_theme.dart';
+import '../utils/page_transitions.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/gradient_button.dart';
+import 'booking_screen.dart';
 
-class DetailScreen extends StatelessWidget {
+class DetailScreen extends StatefulWidget {
   final Destination destination;
-
   const DetailScreen({super.key, required this.destination});
 
   @override
+  State<DetailScreen> createState() => _DetailScreenState();
+}
+
+class _DetailScreenState extends State<DetailScreen>
+    with SingleTickerProviderStateMixin {
+  late ScrollController _scrollController;
+  double _scrollOffset = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(() {
+      setState(() => _scrollOffset = _scrollController.offset);
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final favoritesProvider = Provider.of<FavoritesProvider>(context);
-    final isFav = favoritesProvider.isFavorite(destination);
+    final favorites = context.watch<FavoritesProvider>();
+    final isFav = favorites.isFavorite(widget.destination.id);
+    final d = widget.destination;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0A0E21),
-      body: CustomScrollView(
-        slivers: [
-          // Hero App Bar with flag
-          SliverAppBar(
-            expandedHeight: 300,
-            pinned: true,
-            backgroundColor: const Color(0xFF0A0E21),
-            leading: Padding(
-              padding: const EdgeInsets.all(8),
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.4),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back, color: Colors.white),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ),
-            ),
-            actions: [
-              Padding(
-                padding: const EdgeInsets.all(8),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                  ),
-                  child: IconButton(
-                    icon: Icon(
-                      isFav ? Icons.favorite : Icons.favorite_border,
-                      color: isFav ? const Color(0xFFFF6B6B) : Colors.white,
-                    ),
-                    onPressed: () => favoritesProvider.toggleFavorite(destination),
+      backgroundColor: AppColors.darkBg,
+      body: Stack(
+        children: [
+          CustomScrollView(
+            controller: _scrollController,
+            physics: const BouncingScrollPhysics(),
+            slivers: [
+              // ═══════ HERO IMAGE WITH APPBAR ═══════
+              SliverAppBar(
+                expandedHeight: 420,
+                pinned: true,
+                stretch: true,
+                backgroundColor: AppColors.darkBg,
+                elevation: 0,
+                leading: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: _glassIconButton(
+                    icon: Icons.arrow_back,
+                    onTap: () => Navigator.pop(context),
                   ),
                 ),
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  destination.flagUrl.isNotEmpty
-                      ? Hero(
-                    tag: 'flag_${destination.name}',
-                    child: CachedNetworkImage(
-                      imageUrl: destination.flagUrl,
-                      fit: BoxFit.cover,
-                    ),
-                  )
-                      : Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFFF6B6B), Color(0xFF8E53FF)],
-                      ),
-                    ),
-                  ),
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          const Color(0xFF0A0E21).withValues(alpha: 0.7),
-                          const Color(0xFF0A0E21),
-                        ],
-                      ),
+                actions: [
+                  Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: _glassIconButton(
+                      icon: isFav ? Icons.favorite : Icons.favorite_border,
+                      color: isFav
+                          ? AppColors.goldPrimary
+                          : AppColors.silverLight,
+                      onTap: () {
+                        favorites.toggleFavorite(d);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            backgroundColor: AppColors.darkCard,
+                            behavior: SnackBarBehavior.floating,
+                            margin: const EdgeInsets.all(16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14),
+                              side: BorderSide(
+                                color: AppColors.goldPrimary
+                                    .withOpacity(0.5),
+                              ),
+                            ),
+                            content: Row(
+                              children: [
+                                Icon(
+                                  isFav
+                                      ? Icons.favorite_border
+                                      : Icons.favorite,
+                                  color: AppColors.goldPrimary,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 10),
+                                Text(
+                                  isFav
+                                      ? 'Removed from favorites'
+                                      : 'Added to favorites',
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.textLight,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            duration: const Duration(seconds: 1),
+                          ),
+                        );
+                      },
                     ),
                   ),
                 ],
-              ),
-            ),
-          ),
-
-          // Content
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Flag emoji + Name
-                  Row(
+                flexibleSpace: FlexibleSpaceBar(
+                  stretchModes: const [
+                    StretchMode.zoomBackground,
+                    StretchMode.blurBackground,
+                  ],
+                  background: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Text(destination.flagEmoji, style: const TextStyle(fontSize: 40)),
-                      const SizedBox(width: 12),
-                      Expanded(
+                      // Hero image
+                      Hero(
+                        tag: 'dest-${d.id}',
+                        child: CachedNetworkImage(
+                          imageUrl: d.imageUrl,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: AppColors.darkSurface,
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.goldPrimary,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            color: AppColors.darkSurface,
+                            child: const Icon(
+                              Icons.broken_image,
+                              color: AppColors.silverMid,
+                              size: 48,
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Gradient overlay
+                      Container(
+                        decoration:
+                        BoxDecoration(gradient: AppTheme.overlayGradient),
+                      ),
+                      // Bottom info
+                      Positioned(
+                        bottom: 30,
+                        left: 20,
+                        right: 20,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            Row(
+                              children: [
+                                _pill(
+                                  label: d.category.toUpperCase(),
+                                  gradient: AppTheme.goldGradient,
+                                  textColor: Colors.black,
+                                ),
+                                const SizedBox(width: 10),
+                                _pill(
+                                  label:
+                                  '⭐ ${d.rating}',
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      Colors.black.withOpacity(0.6),
+                                      Colors.black.withOpacity(0.4),
+                                    ],
+                                  ),
+                                  textColor: AppColors.goldPrimary,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 14),
                             Text(
-                              destination.name,
-                              style: GoogleFonts.poppins(
-                                fontSize: 28,
-                                fontWeight: FontWeight.bold,
+                              d.name,
+                              style: GoogleFonts.playfairDisplay(
                                 color: Colors.white,
+                                fontSize: 38,
+                                fontWeight: FontWeight.w800,
+                                height: 1.1,
                               ),
                             ),
-                            Text(
-                              destination.officialName,
-                              style: GoogleFonts.inter(
-                                fontSize: 13,
-                                color: Colors.white.withValues(alpha: 0.6),
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.location_on,
+                                  color: AppColors.goldPrimary,
+                                  size: 18,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  d.country,
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.silverLight,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ],
                             ),
                           ],
                         ),
                       ),
                     ],
-                  ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.2, end: 0),
+                  ),
+                ),
+              ),
 
-                  const SizedBox(height: 32),
+              // ═══════ CONTENT BODY ═══════
+              SliverToBoxAdapter(
+                child: Container(
+                  transform: Matrix4.translationValues(0, -20, 0),
+                  decoration: const BoxDecoration(
+                    color: AppColors.darkBg,
+                    borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(28)),
+                  ),
+                  padding: const EdgeInsets.fromLTRB(20, 30, 20, 30),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Quick info tiles
+                      Row(
+                        children: [
+                          _infoTile(
+                            icon: Icons.star,
+                            label: 'Rating',
+                            value: '${d.rating}',
+                          ),
+                          const SizedBox(width: 12),
+                          _infoTile(
+                            icon: Icons.calendar_today,
+                            label: 'Best Time',
+                            value: d.bestTime.split(' - ').first,
+                          ),
+                          const SizedBox(width: 12),
+                          _infoTile(
+                            icon: Icons.attach_money,
+                            label: 'From',
+                            value: '\$${d.price.toStringAsFixed(0)}',
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
 
-                  Text(
-                    'Overview',
-                    style: GoogleFonts.poppins(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+                      // About section
+                      _sectionTitle('About'),
+                      const SizedBox(height: 12),
+                      Text(
+                        d.description,
+                        style: GoogleFonts.poppins(
+                          color: AppColors.textMuted,
+                          fontSize: 14,
+                          height: 1.75,
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Best time section
+                      _sectionTitle('Best Time to Visit'),
+                      const SizedBox(height: 12),
+                      GlassCard(
+                        padding: const EdgeInsets.all(16),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                gradient: AppTheme.goldGradient,
+                                borderRadius: BorderRadius.circular(12),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.goldPrimary
+                                        .withOpacity(0.4),
+                                    blurRadius: 12,
+                                  ),
+                                ],
+                              ),
+                              child: const Icon(
+                                Icons.wb_sunny,
+                                color: Colors.black,
+                                size: 22,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Recommended Season',
+                                    style: GoogleFonts.poppins(
+                                      color: AppColors.textMuted,
+                                      fontSize: 11,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    d.bestTime,
+                                    style: GoogleFonts.playfairDisplay(
+                                      color: AppColors.textLight,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Highlights
+                      _sectionTitle('Highlights'),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 10,
+                        children: d.highlights
+                            .map((h) => _highlightChip(h))
+                            .toList(),
+                      ),
+                      const SizedBox(height: 28),
+
+                      // Gallery preview
+                      _sectionTitle('Gallery'),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        height: 100,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: 4,
+                          itemBuilder: (_, i) {
+                            return Container(
+                              width: 140,
+                              margin: const EdgeInsets.only(right: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: AppColors.goldPrimary
+                                      .withOpacity(0.3),
+                                ),
+                              ),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(13),
+                                child: CachedNetworkImage(
+                                  imageUrl: d.imageUrl,
+                                  fit: BoxFit.cover,
+                                  placeholder: (_, __) => Container(
+                                    color: AppColors.darkSurface,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                      const SizedBox(height: 120),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // ═══════ FLOATING BOTTOM BAR ═══════
+          Positioned(
+            left: 16,
+            right: 16,
+            bottom: 16,
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.darkCard.withOpacity(0.95),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: AppColors.goldPrimary.withOpacity(0.4),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.6),
+                    blurRadius: 24,
+                    offset: const Offset(0, 8),
+                  ),
+                  BoxShadow(
+                    color: AppColors.goldPrimary.withOpacity(0.15),
+                    blurRadius: 30,
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Total Price',
+                        style: GoogleFonts.poppins(
+                          color: AppColors.textMuted,
+                          fontSize: 10,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '\$${d.price.toStringAsFixed(0)}',
+                            style: GoogleFonts.playfairDisplay(
+                              color: AppColors.goldPrimary,
+                              fontSize: 24,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            ' /person',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.textMuted,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: GradientButton(
+                      label: 'Book Now',
+                      icon: Icons.flight_takeoff,
+                      onTap: () => Navigator.push(
+                        context,
+                        FadeSlideRoute(
+                          page: BookingScreen(destination: d),
+                        ),
+                      ),
                     ),
-                  ).animate().fadeIn(delay: 100.ms),
-
-                  const SizedBox(height: 16),
-
-                  // Info cards grid
-                  Row(
-                    children: [
-                      Expanded(child: _buildInfoCard(Icons.location_city, 'Capital', destination.capital, const Color(0xFFFF6B6B))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildInfoCard(Icons.public, 'Region', destination.region, const Color(0xFF4ECDC4))),
-                    ],
-                  ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2, end: 0),
-
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(child: _buildInfoCard(Icons.map, 'Subregion', destination.subregion.isEmpty ? 'N/A' : destination.subregion, const Color(0xFFFF8E53))),
-                      const SizedBox(width: 12),
-                      Expanded(child: _buildInfoCard(Icons.people, 'Population', _formatNumber(destination.population), const Color(0xFF8E53FF))),
-                    ],
-                  ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0),
-
-                  const SizedBox(height: 32),
-
-                  // Languages
-                  if (destination.languages.isNotEmpty) ...[
-                    Text(
-                      'Languages',
-                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                    ).animate().fadeIn(delay: 400.ms),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: destination.languages.take(8).map((lang) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                          ),
-                          child: Text(
-                            lang,
-                            style: GoogleFonts.inter(fontSize: 13, color: Colors.white.withValues(alpha: 0.9)),
-                          ),
-                        );
-                      }).toList(),
-                    ).animate().fadeIn(delay: 500.ms),
-                    const SizedBox(height: 32),
-                  ],
-
-                  // Currencies
-                  if (destination.currencies.isNotEmpty) ...[
-                    Text(
-                      'Currency',
-                      style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-                    ).animate().fadeIn(delay: 600.ms),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: destination.currencies.map((curr) {
-                        return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                            ),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            curr,
-                            style: GoogleFonts.inter(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.white,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    ).animate().fadeIn(delay: 700.ms),
-                  ],
-
-                  const SizedBox(height: 40),
+                  ),
                 ],
               ),
             ),
@@ -238,46 +461,163 @@ class DetailScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoCard(IconData icon, String label, String value, Color color) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.2),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: color, size: 20),
+  // ═══════ HELPER WIDGETS ═══════
+
+  Widget _glassIconButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    Color color = AppColors.goldPrimary,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.5),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.goldPrimary.withOpacity(0.4),
+            width: 1,
           ),
-          const SizedBox(height: 12),
-          Text(
-            label,
-            style: GoogleFonts.inter(fontSize: 11, color: Colors.white.withValues(alpha: 0.5)),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+        ),
+        child: Icon(icon, color: color, size: 20),
       ),
     );
   }
 
-  String _formatNumber(int number) {
-    if (number >= 1000000000) return '${(number / 1000000000).toStringAsFixed(1)}B';
-    if (number >= 1000000) return '${(number / 1000000).toStringAsFixed(1)}M';
-    if (number >= 1000) return '${(number / 1000).toStringAsFixed(1)}K';
-    return number.toString();
+  Widget _pill({
+    required String label,
+    required Gradient gradient,
+    required Color textColor,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.poppins(
+          color: textColor,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+
+  Widget _sectionTitle(String title) {
+    return Row(
+      children: [
+        Container(
+          width: 4,
+          height: 20,
+          decoration: BoxDecoration(
+            gradient: AppTheme.goldGradient,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Text(
+          title,
+          style: GoogleFonts.playfairDisplay(
+            color: AppColors.textLight,
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _infoTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    return Expanded(
+      child: GlassCard(
+        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        radius: 16,
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.goldPrimary.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: AppColors.goldPrimary, size: 16),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: GoogleFonts.poppins(
+                color: AppColors.textMuted,
+                fontSize: 10,
+                letterSpacing: 0.3,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.poppins(
+                color: AppColors.textLight,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _highlightChip(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.darkSurface,
+        borderRadius: BorderRadius.circular(30),
+        border: Border.all(
+          color: AppColors.goldPrimary.withOpacity(0.4),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.goldPrimary.withOpacity(0.08),
+            blurRadius: 10,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              gradient: AppTheme.goldGradient,
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(
+              Icons.check,
+              color: Colors.black,
+              size: 10,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: GoogleFonts.poppins(
+              color: AppColors.textLight,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

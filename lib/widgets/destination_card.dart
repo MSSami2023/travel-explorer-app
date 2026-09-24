@@ -1,16 +1,21 @@
-import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../models/destination.dart';
+import '../theme/app_theme.dart';
 
 class DestinationCard extends StatelessWidget {
   final Destination destination;
   final VoidCallback onTap;
+  final bool isFavorite;
+  final VoidCallback onFavoriteToggle;
 
   const DestinationCard({
     super.key,
     required this.destination,
     required this.onTap,
+    required this.isFavorite,
+    required this.onFavoriteToggle,
   });
 
   @override
@@ -18,114 +23,152 @@ class DestinationCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        height: 220,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.goldPrimary.withOpacity(0.35),
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFF6B6B).withValues(alpha: 0.15),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
+              color: Colors.black.withOpacity(0.5),
+              blurRadius: 16,
+              offset: const Offset(0, 8),
             ),
           ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(20),
           child: Stack(
-            fit: StackFit.expand,
             children: [
-              // Flag image with Hero animation
-              _buildImage(),
-
-              // Dark gradient overlay
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.transparent,
-                      Colors.black.withValues(alpha: 0.3),
-                      Colors.black.withValues(alpha: 0.85),
+              // Image
+              Positioned.fill(
+                child: CachedNetworkImage(
+                  imageUrl: destination.imageUrl,
+                  fit: BoxFit.cover,
+                  placeholder: (_, __) => Container(
+                    color: AppColors.darkSurface,
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.goldPrimary,
+                        strokeWidth: 2,
+                      ),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: AppColors.darkSurface,
+                    child: const Icon(Icons.broken_image,
+                        color: AppColors.silverMid),
+                  ),
+                ),
+              ),
+              // Gradient overlay
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.overlayGradient,
+                  ),
+                ),
+              ),
+              // Favorite button
+              Positioned(
+                top: 12,
+                right: 12,
+                child: GestureDetector(
+                  onTap: onFavoriteToggle,
+                  child: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.goldPrimary.withOpacity(0.6),
+                      ),
+                    ),
+                    child: Icon(
+                      isFavorite ? Icons.favorite : Icons.favorite_border,
+                      color: isFavorite
+                          ? AppColors.goldPrimary
+                          : AppColors.silverLight,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ),
+              // Rating badge
+              Positioned(
+                top: 12,
+                left: 12,
+                child: Container(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.goldGradient,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.black, size: 14),
+                      const SizedBox(width: 4),
+                      Text(
+                        destination.rating.toString(),
+                        style: GoogleFonts.poppins(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12,
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-
-              // Flag emoji badge (top-left)
+              // Content
               Positioned(
-                top: 16,
                 left: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(
-                    destination.flagEmoji,
-                    style: const TextStyle(fontSize: 20),
-                  ),
-                ),
-              ),
-
-              // Region badge (top-right)
-              Positioned(
-                top: 16,
                 right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    destination.region,
-                    style: GoogleFonts.inter(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-
-              // Bottom info
-              Positioned(
                 bottom: 16,
-                left: 20,
-                right: 20,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      destination.name,
+                      destination.category.toUpperCase(),
                       style: GoogleFonts.poppins(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                        color: AppColors.goldPrimary,
+                        fontSize: 11,
+                        letterSpacing: 2,
+                        fontWeight: FontWeight.w600,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
+                    Text(
+                      destination.name,
+                      style: GoogleFonts.playfairDisplay(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
                     Row(
                       children: [
-                        const Icon(Icons.location_on, color: Color(0xFFFF8E53), size: 16),
+                        const Icon(Icons.location_on,
+                            color: AppColors.silverLight, size: 14),
                         const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            destination.capital,
-                            style: GoogleFonts.inter(
-                              fontSize: 14,
-                              color: Colors.white.withValues(alpha: 0.85),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        Text(
+                          destination.country,
+                          style: GoogleFonts.poppins(
+                            color: AppColors.silverLight,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '\$${destination.price.toStringAsFixed(0)}',
+                          style: GoogleFonts.playfairDisplay(
+                            color: AppColors.goldPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ],
@@ -135,34 +178,6 @@ class DestinationCard extends StatelessWidget {
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildImage() {
-    // Agar flag URL hai to Hero wrap karo, warna simple placeholder
-    if (destination.flagUrl.isNotEmpty) {
-      return Hero(
-        tag: 'flag_${destination.name}',
-        child: CachedNetworkImage(
-          imageUrl: destination.flagUrl,
-          fit: BoxFit.cover,
-          placeholder: (_, __) => _gradientPlaceholder(),
-          errorWidget: (_, __, ___) => _gradientPlaceholder(),
-        ),
-      );
-    }
-    return _gradientPlaceholder();
-  }
-
-  Widget _gradientPlaceholder() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFFFF6B6B), Color(0xFF8E53FF)],
         ),
       ),
     );

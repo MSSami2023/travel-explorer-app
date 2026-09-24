@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import '../services/auth_service.dart';
-import 'login_screen.dart';
+import '../theme/app_theme.dart';
+import '../widgets/animated_background.dart';
 import 'onboarding_screen.dart';
-import 'main_navigation.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -13,184 +11,153 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  final AuthService _authService = AuthService();
+class _SplashScreenState extends State<SplashScreen>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scale;
+  late Animation<double> _fade;
+  late Animation<double> _slide;
 
   @override
   void initState() {
     super.initState();
-    _navigate();
-  }
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
 
-  Future<void> _navigate() async {
-    await Future.delayed(const Duration(milliseconds: 2800));
-
-    if (!mounted) return;
-
-    final hasSeenOnboarding = await _authService.hasSeenOnboarding();
-    final isLoggedIn = await _authService.isLoggedIn();
-
-    if (!mounted) return;
-
-    Widget nextScreen;
-    if (!hasSeenOnboarding) {
-      nextScreen = const OnboardingScreen();
-    } else if (!isLoggedIn) {
-      nextScreen = const LoginScreen();
-    } else {
-      nextScreen = const MainNavigation();
-    }
-
-    Navigator.pushReplacement(
-      context,
-      PageRouteBuilder(
-        transitionDuration: const Duration(milliseconds: 600),
-        pageBuilder: (_, __, ___) => nextScreen,
-        transitionsBuilder: (_, anim, __, child) {
-          return FadeTransition(opacity: anim, child: child);
-        },
+    _scale = Tween<double>(begin: 0.5, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
       ),
     );
+    _fade = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.4, 0.8, curve: Curves.easeIn),
+      ),
+    );
+    _slide = Tween<double>(begin: 30, end: 0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.5, 1.0, curve: Curves.easeOutCubic),
+      ),
+    );
+
+    _controller.forward();
+
+    Future.delayed(const Duration(milliseconds: 2800), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const OnboardingScreen(),
+            transitionsBuilder: (_, anim, __, child) =>
+                FadeTransition(opacity: anim, child: child),
+            transitionDuration: const Duration(milliseconds: 600),
+          ),
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0A0E21),
-              Color(0xFF1A1F38),
-              Color(0xFF0F1428),
+      body: AnimatedBackground(
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (_, __) {
+                  return Transform.scale(
+                    scale: _scale.value,
+                    child: Container(
+                      width: 140,
+                      height: 140,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: AppTheme.goldGradient,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.goldPrimary.withOpacity(0.5),
+                            blurRadius: 40,
+                            spreadRadius: 6,
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.explore,
+                        size: 72,
+                        color: Colors.black,
+                      ),
+                    ),
+                  );
+                },
+              ),
+              const SizedBox(height: 32),
+              FadeTransition(
+                opacity: _fade,
+                child: AnimatedBuilder(
+                  animation: _slide,
+                  builder: (_, __) {
+                    return Transform.translate(
+                      offset: Offset(0, _slide.value),
+                      child: Column(
+                        children: [
+                          ShaderMask(
+                            shaderCallback: (bounds) =>
+                                AppTheme.goldGradient.createShader(bounds),
+                            child: Text(
+                              'TRAVEL EXPLORER',
+                              style: GoogleFonts.playfairDisplay(
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 4,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          Text(
+                            'Luxury • Discovery • Wonder',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.textMuted,
+                              fontSize: 13,
+                              letterSpacing: 3,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 80),
+              FadeTransition(
+                opacity: _fade,
+                child: SizedBox(
+                  width: 180,
+                  child: LinearProgressIndicator(
+                    backgroundColor: AppColors.darkSurface,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.goldPrimary,
+                    ),
+                    minHeight: 2,
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
-        child: Stack(
-          children: [
-            // Glow blobs
-            Positioned(
-              top: -100,
-              right: -100,
-              child: Container(
-                width: 300,
-                height: 300,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFFFF6B6B).withValues(alpha: 0.4),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -150,
-              left: -100,
-              child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      const Color(0xFF8E53FF).withValues(alpha: 0.3),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
-            ),
-
-            // Center content
-            Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  // Animated logo
-                  Container(
-                    padding: const EdgeInsets.all(30),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFFF6B6B).withValues(alpha: 0.5),
-                          blurRadius: 60,
-                          spreadRadius: 10,
-                        ),
-                      ],
-                    ),
-                    child: const Icon(
-                      Icons.public,
-                      size: 80,
-                      color: Colors.white,
-                    ),
-                  )
-                      .animate()
-                      .scale(duration: 800.ms, curve: Curves.easeOutBack)
-                      .then()
-                      .shimmer(duration: 1500.ms),
-
-                  const SizedBox(height: 40),
-
-                  Text(
-                    'Travel Explorer',
-                    style: GoogleFonts.poppins(
-                      fontSize: 36,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 1.2,
-                    ),
-                  )
-                      .animate()
-                      .fadeIn(delay: 500.ms, duration: 800.ms)
-                      .slideY(begin: 0.3, end: 0, curve: Curves.easeOut),
-
-                  const SizedBox(height: 12),
-
-                  Text(
-                    'Explore. Discover. Dream.',
-                    style: GoogleFonts.inter(
-                      fontSize: 15,
-                      color: Colors.white.withValues(alpha: 0.6),
-                      letterSpacing: 3,
-                    ),
-                  ).animate().fadeIn(delay: 1000.ms, duration: 800.ms),
-
-                  const SizedBox(height: 80),
-
-                  // Loading dots
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(3, (index) {
-                      return Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 6),
-                        width: 10,
-                        height: 10,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFFFF6B6B),
-                          shape: BoxShape.circle,
-                        ),
-                      )
-                          .animate(onPlay: (c) => c.repeat())
-                          .fadeIn(delay: (index * 200).ms, duration: 400.ms)
-                          .then()
-                          .fadeOut(duration: 400.ms);
-                    }),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ),
       ),
     );

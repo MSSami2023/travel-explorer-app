@@ -1,13 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
+import '../data/destinations_data.dart';
 import '../models/destination.dart';
-import '../services/api_service.dart';
-import '../widgets/destination_grid_card.dart';
-import '../widgets/gradient_background.dart';
-import '../widgets/shimmer_card.dart';
+import '../providers/favorites_provider.dart';
+import '../theme/app_theme.dart';
+import '../utils/page_transitions.dart';
+import '../widgets/animated_background.dart';
+import '../widgets/category_chip.dart';
+import '../widgets/destination_card.dart';
+import '../widgets/glass_card.dart';
+import '../widgets/loading_shimmer.dart';
 import 'detail_screen.dart';
 import 'favorites_screen.dart';
+import 'search_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,327 +23,446 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final ApiService _apiService = ApiService();
-  late Future<List<Destination>> _destinationsFuture;
-  List<Destination> _allDestinations = [];
-  List<Destination> _filteredDestinations = [];
-  String _searchQuery = '';
-  String _selectedRegion = 'All';
-  final List<String> _regions = [
-    'All',
-    'Africa',
-    'Americas',
-    'Asia',
-    'Europe',
-    'Oceania',
+  List<Destination> _destinations = [];
+  bool _isLoading = true;
+  String? _error;
+  String _selectedCategory = 'All';
+
+  final List<Map<String, dynamic>> _categories = const [
+    {'label': 'All', 'icon': Icons.apps},
+    {'label': 'Beach', 'icon': Icons.beach_access},
+    {'label': 'Mountain', 'icon': Icons.landscape},
+    {'label': 'City', 'icon': Icons.location_city},
+    {'label': 'Cultural', 'icon': Icons.museum},
+    {'label': 'Adventure', 'icon': Icons.hiking},
   ];
-  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
-    _destinationsFuture = _apiService.fetchDestinations();
+    _load();
   }
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
-  void _filterDestinations() {
+  Future<void> _load() async {
     setState(() {
-      _filteredDestinations = _allDestinations.where((d) {
-        final matchesSearch =
-            d.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                d.capital.toLowerCase().contains(_searchQuery.toLowerCase());
-        final matchesRegion =
-            _selectedRegion == 'All' || d.region == _selectedRegion;
-        return matchesSearch && matchesRegion;
-      }).toList();
+      _isLoading = true;
+      _error = null;
     });
+    try {
+      await Future.delayed(const Duration(milliseconds: 1200));
+      if (!mounted) return;
+      setState(() {
+        _destinations = destinationsData;
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = 'Failed to load destinations. Please try again.';
+        _isLoading = false;
+      });
+    }
   }
+
+  List<Destination> get _filtered => _selectedCategory == 'All'
+      ? _destinations
+      : _destinations.where((d) => d.category == _selectedCategory).toList();
 
   @override
   Widget build(BuildContext context) {
+    final favorites = context.watch<FavoritesProvider>();
+    final width = MediaQuery.of(context).size.width;
+    final cross = width > 900 ? 3 : (width > 600 ? 2 : 1);
+
     return Scaffold(
-      body: GradientBackground(
+      backgroundColor: Colors.transparent,
+      extendBodyBehindAppBar: true,
+      body: AnimatedBackground(
         child: SafeArea(
-          child: Column(
-            children: [
-              _buildHeader(),
-              _buildSearchBar(),
-              _buildCategoryChips(),
-              const SizedBox(height: 8),
-              Expanded(child: _buildBody()),
-            ],
+          child: RefreshIndicator(
+            color: AppColors.goldPrimary,
+            backgroundColor: AppColors.darkCard,
+            onRefresh: _load,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(),
+              slivers: [
+                // Header
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Good Evening 👋',
+                                    style: GoogleFonts.poppins(
+                                      color: AppColors.textMuted,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  ShaderMask(
+                                    shaderCallback: (b) =>
+                                        AppTheme.goldGradient
+                                            .createShader(b),
+                                    child: Text(
+                                      'Explore Paradise',
+                                      style: GoogleFonts.playfairDisplay(
+                                        fontSize: 26,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: () => Navigator.push(
+                                context,
+                                ScaleFadeRoute(
+                                    page: const FavoritesScreen()),
+                              ),
+                              child: Stack(
+                                children: [
+                                  GlassCard(
+                                    padding: const EdgeInsets.all(12),
+                                    radius: 14,
+                                    child: const Icon(
+                                      Icons.favorite,
+                                      color: AppColors.goldPrimary,
+                                      size: 22,
+                                    ),
+                                  ),
+                                  if (favorites.count > 0)
+                                    Positioned(
+                                      right: 4,
+                                      top: 4,
+                                      child: Container(
+                                        padding: const EdgeInsets.all(5),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.redAccent,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: Text(
+                                          '${favorites.count}',
+                                          style: const TextStyle(
+                                            fontSize: 9,
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        // Search bar
+                        GestureDetector(
+                          onTap: () => Navigator.push(
+                            context,
+                            FadeSlideRoute(
+                              page: SearchScreen(
+                                  destinations: _destinations),
+                            ),
+                          ),
+                          child: GlassCard(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 16),
+                            radius: 16,
+                            child: Row(
+                              children: [
+                                const Icon(Icons.search,
+                                    color: AppColors.goldPrimary),
+                                const SizedBox(width: 12),
+                                Text(
+                                  'Where do you want to go?',
+                                  style: GoogleFonts.poppins(
+                                    color: AppColors.textMuted,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                const Spacer(),
+                                const Icon(Icons.tune,
+                                    color: AppColors.goldPrimary, size: 20),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Banner
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _FeaturedBanner(
+                      destination: _destinations.isNotEmpty
+                          ? _destinations[7]
+                          : null,
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 24)),
+                // Categories
+                SliverToBoxAdapter(
+                  child: SizedBox(
+                    height: 52,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: _categories.length,
+                      itemBuilder: (_, i) {
+                        final c = _categories[i];
+                        return CategoryChip(
+                          label: c['label'],
+                          icon: c['icon'],
+                          isSelected: _selectedCategory == c['label'],
+                          onTap: () => setState(
+                                  () => _selectedCategory = c['label']),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 20)),
+                // Section title
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 4,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.goldGradient,
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Text(
+                          _selectedCategory == 'All'
+                              ? 'Popular Destinations'
+                              : '$_selectedCategory Escapes',
+                          style: GoogleFonts.playfairDisplay(
+                            color: AppColors.textLight,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${_filtered.length} places',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.textMuted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SliverToBoxAdapter(child: SizedBox(height: 14)),
+                // Content
+                if (_isLoading)
+                  SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                          (_, __) => const LoadingShimmer(),
+                      childCount: 4,
+                    ),
+                  )
+                else if (_error != null)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child:
+                    _ErrorState(message: _error!, onRetry: _load),
+                  )
+                else if (_filtered.isEmpty)
+                    const SliverFillRemaining(
+                      hasScrollBody: false,
+                      child: _EmptyState(),
+                    )
+                  else
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      sliver: SliverGrid(
+                        gridDelegate:
+                        SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: cross,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 16,
+                          childAspectRatio: 0.82,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                              (context, i) {
+                            final dest = _filtered[i];
+                            return DestinationCard(
+                              destination: dest,
+                              isFavorite: favorites.isFavorite(dest.id),
+                              onFavoriteToggle: () =>
+                                  favorites.toggleFavorite(dest),
+                              onTap: () => Navigator.push(
+                                context,
+                                FadeSlideRoute(
+                                  page: DetailScreen(destination: dest),
+                                ),
+                              ),
+                            );
+                          },
+                          childCount: _filtered.length,
+                        ),
+                      ),
+                    ),
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeader() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Explore the World 🌍',
-                style: GoogleFonts.poppins(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Discover amazing destinations',
-                style: GoogleFonts.inter(
-                  fontSize: 13,
-                  color: Colors.white.withValues(alpha: 0.6),
-                ),
-              ),
-            ],
-          ),
-          GestureDetector(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
-              );
-            },
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.15),
-                ),
-              ),
-              child: const Icon(
-                Icons.favorite,
-                color: Color(0xFFFF6B6B),
-                size: 24,
-              ),
-            ),
-          ),
-        ],
+class _FeaturedBanner extends StatelessWidget {
+  final Destination? destination;
+  const _FeaturedBanner({this.destination});
+
+  @override
+  Widget build(BuildContext context) {
+    if (destination == null) return const SizedBox(height: 180);
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        FadeSlideRoute(page: DetailScreen(destination: destination!)),
       ),
-    ).animate().fadeIn(duration: 500.ms).slideY(begin: -0.2, end: 0);
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
+        height: 180,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-        ),
-        child: TextField(
-          controller: _searchController,
-          style: GoogleFonts.inter(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'Search countries or capitals...',
-            hintStyle: GoogleFonts.inter(
-              color: Colors.white.withValues(alpha: 0.4),
-            ),
-            prefixIcon: Icon(
-              Icons.search,
-              color: Colors.white.withValues(alpha: 0.6),
-            ),
-            suffixIcon: _searchQuery.isNotEmpty
-                ? IconButton(
-              icon: const Icon(Icons.close, color: Colors.white70),
-              onPressed: () {
-                _searchController.clear();
-                _searchQuery = '';
-                _filterDestinations();
-              },
-            )
-                : null,
-            border: InputBorder.none,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 20,
-              vertical: 18,
-            ),
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: AppColors.goldPrimary.withOpacity(0.5),
+            width: 1,
           ),
-          onChanged: (value) {
-            _searchQuery = value;
-            _filterDestinations();
-          },
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.goldPrimary.withOpacity(0.15),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
         ),
-      ),
-    )
-        .animate()
-        .fadeIn(delay: 150.ms, duration: 500.ms)
-        .slideY(begin: 0.2, end: 0);
-  }
-
-  Widget _buildCategoryChips() {
-    return Container(
-      height: 50,
-      margin: const EdgeInsets.only(top: 16),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _regions.length,
-        itemBuilder: (context, index) {
-          final region = _regions[index];
-          final isSelected = _selectedRegion == region;
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                _selectedRegion = region;
-                _filterDestinations();
-              });
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              margin: const EdgeInsets.symmetric(horizontal: 6),
-              padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: isSelected
-                    ? const LinearGradient(
-                  colors: [Color(0xFFFF6B6B), Color(0xFFFF8E53)],
-                )
-                    : null,
-                color: isSelected
-                    ? null
-                    : Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isSelected
-                      ? Colors.transparent
-                      : Colors.white.withValues(alpha: 0.12),
-                ),
-              ),
-              child: Center(
-                child: Text(
-                  region,
-                  style: GoogleFonts.inter(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isSelected
-                        ? Colors.white
-                        : Colors.white.withValues(alpha: 0.7),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(22),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Image.network(destination!.imageUrl, fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) =>
+                      Container(color: AppColors.darkSurface)),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.black.withOpacity(0.1),
+                      Colors.black.withOpacity(0.85),
+                    ],
+                    begin: Alignment.topRight,
+                    end: Alignment.bottomLeft,
                   ),
                 ),
               ),
-            ),
-          );
-        },
-      ),
-    ).animate().fadeIn(delay: 300.ms, duration: 500.ms);
-  }
-
-  Widget _buildBody() {
-    return FutureBuilder<List<Destination>>(
-      future: _destinationsFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return _buildLoading();
-        }
-
-        if (snapshot.hasError) {
-          return _buildError(snapshot.error.toString());
-        }
-
-        if (snapshot.hasData) {
-          _allDestinations = snapshot.data!;
-          if (_filteredDestinations.isEmpty &&
-              _searchQuery.isEmpty &&
-              _selectedRegion == 'All') {
-            _filteredDestinations = _allDestinations;
-          }
-
-          if (_filteredDestinations.isEmpty) {
-            return _buildEmpty();
-          }
-
-          return LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final crossAxisCount = width < 600
-                  ? 2
-                  : width < 900
-                  ? 3
-                  : 4;
-
-              return GridView.builder(
-                padding: const EdgeInsets.fromLTRB(20, 10, 20, 100),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 14,
-                  mainAxisSpacing: 14,
-                  childAspectRatio: 0.78,
+              Positioned(
+                left: 20,
+                top: 18,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: AppTheme.goldGradient,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '✦ FEATURED',
+                    style: GoogleFonts.poppins(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
                 ),
-                itemCount: _filteredDestinations.length,
-                itemBuilder: (context, index) {
-                  final destination = _filteredDestinations[index];
-                  return DestinationGridCard(
-                    destination: destination,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              DetailScreen(destination: destination),
+              ),
+              Positioned(
+                left: 20,
+                right: 20,
+                bottom: 18,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      destination!.name,
+                      style: GoogleFonts.playfairDisplay(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        const Icon(Icons.location_on,
+                            color: AppColors.goldPrimary, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          destination!.country,
+                          style: GoogleFonts.poppins(
+                            color: AppColors.silverLight,
+                            fontSize: 13,
+                          ),
                         ),
-                      );
-                    },
-                  )
-                      .animate()
-                      .fadeIn(delay: (index * 30).ms, duration: 400.ms)
-                      .scale(
-                    begin: const Offset(0.9, 0.9),
-                    end: const Offset(1, 1),
-                  );
-                },
-              );
-            },
-          );
-        }
-
-        return const SizedBox.shrink();
-      },
-    );
-  }
-
-  Widget _buildLoading() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final crossAxisCount = width < 600
-            ? 2
-            : width < 900
-            ? 3
-            : 4;
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(20),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 0.78,
+                        const SizedBox(width: 16),
+                        const Icon(Icons.star,
+                            color: AppColors.goldPrimary, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${destination!.rating}',
+                          style: GoogleFonts.poppins(
+                            color: AppColors.silverLight,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          itemCount: 6,
-          itemBuilder: (_, __) => const ShimmerCard(),
-        );
-      },
+        ),
+      ),
     );
   }
+}
 
-  Widget _buildError(String error) {
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -345,97 +470,61 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFFF6B6B).withValues(alpha: 0.15),
                 shape: BoxShape.circle,
+                border: Border.all(
+                    color: AppColors.goldPrimary.withOpacity(0.5)),
               ),
-              child: const Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Color(0xFFFF6B6B),
-              ),
+              child: const Icon(Icons.cloud_off,
+                  size: 48, color: AppColors.goldPrimary),
             ),
-            const SizedBox(height: 24),
-            Text(
-              'Oops! Something went wrong',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              error,
-              textAlign: TextAlign.center,
-              style: GoogleFonts.inter(
-                fontSize: 13,
-                color: Colors.white.withValues(alpha: 0.6),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () {
-                setState(() {
-                  _destinationsFuture = _apiService.fetchDestinations();
-                });
-              },
-              icon: const Icon(Icons.refresh),
-              label: Text(
-                'Try Again',
-                style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-              ),
+            const SizedBox(height: 20),
+            Text(message,
+                textAlign: TextAlign.center,
+                style: GoogleFonts.poppins(
+                    color: AppColors.textMuted, fontSize: 14)),
+            const SizedBox(height: 20),
+            ElevatedButton(
+              onPressed: onRetry,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B),
-                foregroundColor: Colors.white,
-                padding:
-                const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                backgroundColor: AppColors.goldPrimary,
+                foregroundColor: Colors.black,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 14),
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
+                    borderRadius: BorderRadius.circular(30)),
               ),
+              child: Text('Retry',
+                  style:
+                  GoogleFonts.poppins(fontWeight: FontWeight.w600)),
             ),
           ],
         ),
       ),
     );
   }
+}
 
-  Widget _buildEmpty() {
+class _EmptyState extends StatelessWidget {
+  const _EmptyState();
+
+  @override
+  Widget build(BuildContext context) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              Icons.search_off,
-              size: 48,
-              color: Colors.white.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'No destinations found',
-            style: GoogleFonts.poppins(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Try a different search or filter',
-            style: GoogleFonts.inter(
-              fontSize: 13,
-              color: Colors.white.withValues(alpha: 0.6),
-            ),
-          ),
+          const Icon(Icons.travel_explore,
+              size: 64, color: AppColors.silverDark),
+          const SizedBox(height: 16),
+          Text('No destinations found',
+              style: GoogleFonts.playfairDisplay(
+                  color: AppColors.textLight, fontSize: 20)),
+          const SizedBox(height: 6),
+          Text('Try a different category',
+              style: GoogleFonts.poppins(
+                  color: AppColors.textMuted, fontSize: 13)),
         ],
       ),
     );

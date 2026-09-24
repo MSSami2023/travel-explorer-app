@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../models/destination.dart';
-import '../services/api_service.dart';
-import '../widgets/destination_grid_card.dart';
-import '../widgets/gradient_background.dart';
-import '../widgets/shimmer_card.dart';
+import 'package:provider/provider.dart';
+import '../data/destinations_data.dart';
+import '../providers/favorites_provider.dart';
+import '../theme/app_theme.dart';
+import '../utils/page_transitions.dart';
+import '../widgets/animated_background.dart';
+import '../widgets/destination_card.dart';
 import 'detail_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
@@ -16,335 +17,186 @@ class ExploreScreen extends StatefulWidget {
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  final ApiService _apiService = ApiService();
-  late Future<List<Destination>> _destinationsFuture;
-  List<Destination> _allDestinations = [];
-  List<Destination> _filteredDestinations = [];
-  String _selectedRegion = 'All';
-  String _sortBy = 'Name';
-  bool _hasAppliedInitialFilter = false;
+  String _sort = 'Popular';
+  RangeValues _priceRange = const RangeValues(0, 3000);
 
-  final List<String> _regions = [
-    'All',
-    'Africa',
-    'Americas',
-    'Asia',
-    'Europe',
-    'Oceania',
-  ];
-  final List<String> _sortOptions = ['Name', 'Population', 'Region'];
-
-  @override
-  void initState() {
-    super.initState();
-    _destinationsFuture = _apiService.fetchDestinations();
-  }
-
-  // Ye function sirf data filter karta hai, setState nahi karta
-  List<Destination> _getFilteredDestinations() {
-    final filtered = _allDestinations.where((d) {
-      return _selectedRegion == 'All' || d.region == _selectedRegion;
-    }).toList();
-
-    if (_sortBy == 'Name') {
-      filtered.sort((a, b) => a.name.compareTo(b.name));
-    } else if (_sortBy == 'Population') {
-      filtered.sort((a, b) => b.population.compareTo(a.population));
-    } else if (_sortBy == 'Region') {
-      filtered.sort((a, b) => a.region.compareTo(b.region));
+  List<dynamic> get _sorted {
+    final list = destinationsData
+        .where((d) =>
+    d.price >= _priceRange.start && d.price <= _priceRange.end)
+        .toList();
+    switch (_sort) {
+      case 'Price ↑':
+        list.sort((a, b) => a.price.compareTo(b.price));
+        break;
+      case 'Price ↓':
+        list.sort((a, b) => b.price.compareTo(a.price));
+        break;
+      case 'Rating':
+        list.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      default:
+        list.sort((a, b) => b.rating.compareTo(a.rating));
     }
-
-    return filtered;
+    return list;
   }
 
   @override
   Widget build(BuildContext context) {
+    final favorites = context.watch<FavoritesProvider>();
+    final width = MediaQuery.of(context).size.width;
+    final cross = width > 900 ? 3 : (width > 600 ? 2 : 1);
+
     return Scaffold(
-      body: GradientBackground(
+      backgroundColor: Colors.transparent,
+      body: AnimatedBackground(
         child: SafeArea(
           child: Column(
             children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                padding: const EdgeInsets.all(20),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Explore 🔍',
-                          style: GoogleFonts.poppins(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
+                    ShaderMask(
+                      shaderCallback: (b) =>
+                          AppTheme.goldGradient.createShader(b),
+                      child: Text(
+                        'Explore',
+                        style: GoogleFonts.playfairDisplay(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Discover all destinations',
-                          style: GoogleFonts.inter(
-                            fontSize: 13,
-                            color: Colors.white.withValues(alpha: 0.6),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
-                    GestureDetector(
-                      onTap: _showSortOptions,
+                    const Spacer(),
+                    PopupMenuButton<String>(
+                      color: AppColors.darkCard,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        side: BorderSide(
+                          color: AppColors.goldPrimary.withOpacity(0.4),
+                        ),
+                      ),
+                      onSelected: (v) => setState(() => _sort = v),
+                      itemBuilder: (_) => const [
+                        PopupMenuItem(value: 'Popular', child: Text('Popular')),
+                        PopupMenuItem(value: 'Rating', child: Text('Top Rated')),
+                        PopupMenuItem(value: 'Price ↑', child: Text('Price Low → High')),
+                        PopupMenuItem(value: 'Price ↓', child: Text('Price High → Low')),
+                      ],
                       child: Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.15),
+                            color: AppColors.goldPrimary.withOpacity(0.4),
                           ),
                         ),
-                        child: const Icon(
-                          Icons.sort,
-                          color: Color(0xFFFF6B6B),
-                          size: 22,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.sort,
+                                color: AppColors.goldPrimary, size: 18),
+                            const SizedBox(width: 6),
+                            Text(_sort,
+                                style: GoogleFonts.poppins(
+                                    color: AppColors.textLight,
+                                    fontSize: 12)),
+                          ],
                         ),
                       ),
                     ),
                   ],
                 ),
-              ).animate().fadeIn(duration: 400.ms),
-              Container(
-                height: 50,
-                margin: const EdgeInsets.only(top: 8),
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: _regions.length,
-                  itemBuilder: (context, index) {
-                    final region = _regions[index];
-                    final isSelected = _selectedRegion == region;
-                    return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedRegion = region;
-                          _filteredDestinations = _getFilteredDestinations();
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 250),
-                        margin: const EdgeInsets.symmetric(horizontal: 6),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          gradient: isSelected
-                              ? const LinearGradient(
-                            colors: [
-                              Color(0xFFFF6B6B),
-                              Color(0xFFFF8E53),
-                            ],
-                          )
-                              : null,
-                          color: isSelected
-                              ? null
-                              : Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: isSelected
-                                ? Colors.transparent
-                                : Colors.white.withValues(alpha: 0.12),
+              ),
+              // Price slider
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: AppColors.darkSurface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.silverDark.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          const Icon(Icons.attach_money,
+                              color: AppColors.goldPrimary, size: 18),
+                          Text(
+                            'Price Range',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.textLight,
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            region,
-                            style: GoogleFonts.inter(
+                          const Spacer(),
+                          Text(
+                            '\$${_priceRange.start.toInt()} - \$${_priceRange.end.toInt()}',
+                            style: GoogleFonts.poppins(
+                              color: AppColors.goldPrimary,
                               fontSize: 13,
                               fontWeight: FontWeight.w600,
-                              color: isSelected
-                                  ? Colors.white
-                                  : Colors.white.withValues(alpha: 0.7),
                             ),
                           ),
-                        ),
+                        ],
+                      ),
+                      RangeSlider(
+                        values: _priceRange,
+                        min: 0,
+                        max: 3000,
+                        divisions: 30,
+                        activeColor: AppColors.goldPrimary,
+                        inactiveColor: AppColors.silverDark,
+                        onChanged: (v) => setState(() => _priceRange = v),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: _sorted.isEmpty
+                    ? Center(
+                    child: Text('No results in this range',
+                        style: GoogleFonts.poppins(
+                            color: AppColors.textMuted)))
+                    : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 100),
+                  physics: const BouncingScrollPhysics(),
+                  gridDelegate:
+                  SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cross,
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    childAspectRatio: 0.82,
+                  ),
+                  itemCount: _sorted.length,
+                  itemBuilder: (_, i) {
+                    final dest = _sorted[i];
+                    return DestinationCard(
+                      destination: dest,
+                      isFavorite: favorites.isFavorite(dest.id),
+                      onFavoriteToggle: () =>
+                          favorites.toggleFavorite(dest),
+                      onTap: () => Navigator.push(
+                        context,
+                        FadeSlideRoute(
+                            page: DetailScreen(destination: dest)),
                       ),
                     );
-                  },
-                ),
-              ).animate().fadeIn(delay: 200.ms),
-              const SizedBox(height: 8),
-              Expanded(
-                child: FutureBuilder<List<Destination>>(
-                  future: _destinationsFuture,
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
-                      return _buildLoading();
-                    }
-
-                    if (snapshot.hasError) {
-                      return Center(
-                        child: Text(
-                          'Error loading data',
-                          style: GoogleFonts.inter(color: Colors.white70),
-                        ),
-                      );
-                    }
-
-                    if (snapshot.hasData) {
-                      // Pehli baar data set karo
-                      if (!_hasAppliedInitialFilter) {
-                        _allDestinations = snapshot.data!;
-                        _filteredDestinations = _getFilteredDestinations();
-                        _hasAppliedInitialFilter = true;
-                      }
-
-                      if (_filteredDestinations.isEmpty) {
-                        return Center(
-                          child: Text(
-                            'No destinations found',
-                            style: GoogleFonts.inter(
-                              color: Colors.white70,
-                            ),
-                          ),
-                        );
-                      }
-
-                      return LayoutBuilder(
-                        builder: (context, constraints) {
-                          final width = constraints.maxWidth;
-                          final crossAxisCount = width < 600
-                              ? 2
-                              : width < 900
-                              ? 3
-                              : 4;
-
-                          return GridView.builder(
-                            padding: const EdgeInsets.fromLTRB(
-                              20,
-                              10,
-                              20,
-                              100,
-                            ),
-                            gridDelegate:
-                            SliverGridDelegateWithFixedCrossAxisCount(
-                              crossAxisCount: crossAxisCount,
-                              crossAxisSpacing: 14,
-                              mainAxisSpacing: 14,
-                              childAspectRatio: 0.78,
-                            ),
-                            itemCount: _filteredDestinations.length,
-                            itemBuilder: (context, index) {
-                              final destination =
-                              _filteredDestinations[index];
-                              return DestinationGridCard(
-                                destination: destination,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (_) => DetailScreen(
-                                        destination: destination,
-                                      ),
-                                    ),
-                                  );
-                                },
-                              )
-                                  .animate()
-                                  .fadeIn(
-                                delay: (index * 30).ms,
-                                duration: 400.ms,
-                              )
-                                  .scale(
-                                begin: const Offset(0.9, 0.9),
-                                end: const Offset(1, 1),
-                              );
-                            },
-                          );
-                        },
-                      );
-                    }
-
-                    return const SizedBox.shrink();
                   },
                 ),
               ),
             ],
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLoading() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final width = constraints.maxWidth;
-        final crossAxisCount = width < 600
-            ? 2
-            : width < 900
-            ? 3
-            : 4;
-
-        return GridView.builder(
-          padding: const EdgeInsets.all(20),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 14,
-            mainAxisSpacing: 14,
-            childAspectRatio: 0.78,
-          ),
-          itemCount: 6,
-          itemBuilder: (_, __) => const ShimmerCard(),
-        );
-      },
-    );
-  }
-
-  void _showSortOptions() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: const Color(0xFF1A1F38),
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Sort By',
-              style: GoogleFonts.poppins(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 16),
-            ..._sortOptions.map((option) {
-              final isSelected = _sortBy == option;
-              return ListTile(
-                onTap: () {
-                  setState(() {
-                    _sortBy = option;
-                    _filteredDestinations = _getFilteredDestinations();
-                  });
-                  Navigator.pop(context);
-                },
-                leading: Icon(
-                  isSelected
-                      ? Icons.radio_button_checked
-                      : Icons.radio_button_unchecked,
-                  color: const Color(0xFFFF6B6B),
-                ),
-                title: Text(
-                  option,
-                  style: GoogleFonts.inter(color: Colors.white),
-                ),
-              );
-            }).toList(),
-          ],
         ),
       ),
     );

@@ -1,172 +1,136 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import '../models/destination.dart';
-import '../services/api_service.dart';
-import '../widgets/gradient_background.dart';
+import '../providers/favorites_provider.dart';
+import '../theme/app_theme.dart';
 import '../widgets/destination_card.dart';
 import 'detail_screen.dart';
 
 class SearchScreen extends StatefulWidget {
-  const SearchScreen({super.key});
+  final List<Destination> destinations;
+  const SearchScreen({super.key, required this.destinations});
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final ApiService _apiService = ApiService();
-  final TextEditingController _controller = TextEditingController();
-  List<Destination> _allDestinations = [];
-  List<Destination> _results = [];
-  bool _isLoading = false;
-
-  final List<String> _trending = ['Pakistan', 'Japan', 'Canada', 'Brazil', 'Germany'];
+  final _controller = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+  String _query = '';
 
   @override
-  void initState() {
-    super.initState();
-    _loadAll();
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
   }
 
-  Future<void> _loadAll() async {
-    setState(() => _isLoading = true);
-    try {
-      final data = await _apiService.fetchDestinations();
-      setState(() {
-        _allDestinations = data;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-    }
-  }
-
-  void _search(String query) {
-    if (query.isEmpty) {
-      setState(() => _results = []);
-      return;
-    }
-    setState(() {
-      _results = _allDestinations
-          .where((d) =>
-      d.name.toLowerCase().contains(query.toLowerCase()) ||
-          d.capital.toLowerCase().contains(query.toLowerCase()))
-          .take(20)
-          .toList();
-    });
+  List<Destination> get _results {
+    if (_query.trim().isEmpty) return [];
+    final q = _query.toLowerCase();
+    return widget.destinations.where((d) {
+      return d.name.toLowerCase().contains(q) ||
+          d.country.toLowerCase().contains(q) ||
+          d.category.toLowerCase().contains(q);
+    }).toList();
   }
 
   @override
   Widget build(BuildContext context) {
+    final favorites = context.watch<FavoritesProvider>();
+    final results = _results;
+    final width = MediaQuery.of(context).size.width;
+    final crossAxisCount = width > 900 ? 3 : (width > 600 ? 2 : 1);
+
     return Scaffold(
-      body: GradientBackground(
-        child: SafeArea(
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Text(
-                  'Search',
-                  style: GoogleFonts.poppins(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
+      appBar: AppBar(title: const Text('Search')),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Form(
+              key: _formKey,
+              child: TextFormField(
+                controller: _controller,
+                autofocus: true,
+                style: GoogleFonts.poppins(color: AppColors.textLight),
+                onChanged: (v) => setState(() => _query = v),
+                validator: (v) {
+                  if (v != null && v.trim().length == 1) {
+                    return 'Type at least 2 characters';
+                  }
+                  return null;
+                },
+                decoration: InputDecoration(
+                  hintText: 'Search by name, country, or category...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: _query.isNotEmpty
+                      ? IconButton(
+                    icon: const Icon(Icons.clear,
+                        color: AppColors.silverMid),
+                    onPressed: () {
+                      _controller.clear();
+                      setState(() => _query = '');
+                    },
+                  )
+                      : null,
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                  ),
-                  child: TextField(
-                    controller: _controller,
-                    autofocus: true,
-                    style: GoogleFonts.inter(color: Colors.white),
-                    decoration: InputDecoration(
-                      hintText: 'Search countries or capitals...',
-                      hintStyle: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.4)),
-                      prefixIcon: const Icon(Icons.search, color: Colors.white54),
-                      suffixIcon: _controller.text.isNotEmpty
-                          ? IconButton(
-                        icon: const Icon(Icons.close, color: Colors.white54),
-                        onPressed: () {
-                          _controller.clear();
-                          _search('');
-                        },
-                      )
-                          : null,
-                      border: InputBorder.none,
-                      contentPadding: const EdgeInsets.symmetric(vertical: 18),
-                    ),
-                    onChanged: _search,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Expanded(
-                child: _isLoading
-                    ? const Center(child: CircularProgressIndicator(color: Color(0xFFFF6B6B)))
-                    : _results.isEmpty && _controller.text.isEmpty
-                    ? _buildSuggestions()
-                    : _results.isEmpty
-                    ? _buildNoResults()
-                    : ListView.builder(
-                  itemCount: _results.length,
-                  itemBuilder: (context, index) {
-                    final d = _results[index];
-                    return DestinationCard(
-                      destination: d,
-                      onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (_) => DetailScreen(destination: d)),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
+            ),
           ),
-        ),
+          Expanded(
+            child: _query.trim().isEmpty
+                ? _buildHint()
+                : results.isEmpty
+                ? _buildNoResults()
+                : GridView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              gridDelegate:
+              SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: crossAxisCount,
+                crossAxisSpacing: 16,
+                mainAxisSpacing: 16,
+                childAspectRatio: 0.85,
+              ),
+              itemCount: results.length,
+              itemBuilder: (_, i) {
+                final dest = results[i];
+                return DestinationCard(
+                  destination: dest,
+                  isFavorite: favorites.isFavorite(dest.id),
+                  onFavoriteToggle: () =>
+                      favorites.toggleFavorite(dest),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          DetailScreen(destination: dest),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildSuggestions() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+  Widget _buildHint() {
+    return Center(
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            'Trending Now 🔥',
-            style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white),
-          ),
+          const Icon(Icons.search, size: 72, color: AppColors.silverDark),
           const SizedBox(height: 16),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: _trending.map((t) {
-              return GestureDetector(
-                onTap: () {
-                  _controller.text = t;
-                  _search(t);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-                  ),
-                  child: Text(t, style: GoogleFonts.inter(color: Colors.white)),
-                ),
-              );
-            }).toList(),
-          ),
+          Text('Start typing to explore',
+              style: GoogleFonts.playfairDisplay(
+                  color: AppColors.textLight, fontSize: 20)),
+          const SizedBox(height: 6),
+          Text('Find your dream destination',
+              style: GoogleFonts.poppins(
+                  color: AppColors.textMuted, fontSize: 13)),
         ],
       ),
     );
@@ -177,12 +141,15 @@ class _SearchScreenState extends State<SearchScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.search_off, size: 64, color: Colors.white.withValues(alpha: 0.4)),
+          const Icon(Icons.search_off, size: 72, color: AppColors.silverDark),
           const SizedBox(height: 16),
-          Text(
-            'No results for "${_controller.text}"',
-            style: GoogleFonts.inter(color: Colors.white.withValues(alpha: 0.6)),
-          ),
+          Text('No results found',
+              style: GoogleFonts.playfairDisplay(
+                  color: AppColors.textLight, fontSize: 20)),
+          const SizedBox(height: 6),
+          Text('Try a different keyword',
+              style: GoogleFonts.poppins(
+                  color: AppColors.textMuted, fontSize: 13)),
         ],
       ),
     );
